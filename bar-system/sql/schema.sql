@@ -47,10 +47,10 @@ create table if not exists operadores (
   nome text,
   login text not null unique,
   senha text not null,
-  perfil text not null check (perfil in ('garcom', 'caixa')),
+  perfil text not null check (perfil in ('garcom', 'caixa', 'admin')),
   ativo boolean default true
 );
 
 insert into operadores (nome, login, senha, perfil, ativo)
-values ('Administrador', 'admin', 'admin', 'caixa', true)
+values ('Administrador', 'admin', 'admin', 'admin', true)
 on conflict (login) do nothing;
