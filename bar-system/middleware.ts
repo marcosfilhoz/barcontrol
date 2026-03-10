@@ -20,6 +20,17 @@ export function middleware(request: NextRequest) {
   const sessionCookie = request.cookies.get("bar_session")?.value;
   const role = request.cookies.get("bar_role")?.value;
 
+  // Rotas públicas: login, acesso negado, arquivos estáticos e APIs
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/acesso-negado") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
+
   if (!sessionCookie) {
     return redirectToLogin(request);
   }
@@ -59,14 +70,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/mesas/:path*",
-    "/mesa/:path*",
-    "/caixa/:path*",
-    "/cozinha/:path*",
-    "/delivery/:path*",
-    "/cardapio/:path*",
-    "/categorias/:path*",
-    "/usuarios/:path*"
-  ]
+  // Protege todas as rotas de app, exceto login, acesso-negado, api e estáticos.
+  matcher: ["/((?!login|acesso-negado|api|_next|favicon.ico).*)"]
 };
