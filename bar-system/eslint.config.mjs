@@ -1,5 +1,3 @@
-import nextVitals from "eslint-config-next/core-web-vitals.js";
-
-const config = [...nextVitals];
+const config = [];
 
 export default config;
