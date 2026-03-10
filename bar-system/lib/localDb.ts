@@ -253,8 +253,8 @@ function getNextPedidoNumero(db: LocalDb): number {
 
 export async function authOperador(login: string, senha: string): Promise<Operador | null> {
   const db = await readDb();
-  const operadoresNormalizados = db.operadores.map((operador) =>
-    operador.perfil === "caixa" ? { ...operador, perfil: "admin" } : operador
+  const operadoresNormalizados: Operador[] = db.operadores.map((operador) =>
+    operador.perfil === "caixa" ? { ...operador, perfil: "admin" as Perfil } : operador
   );
   return (
     operadoresNormalizados.find(
