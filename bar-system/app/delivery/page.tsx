@@ -19,6 +19,7 @@ type PedidoDelivery = {
   endereco_entrega: string;
   telefone: string;
   tipo_pagamento: TipoPagamento;
+  aberto_em: string;
 };
 type DeliveryAberto = PedidoDelivery & { aberto_em: string };
 type ItemDetalhe = {
