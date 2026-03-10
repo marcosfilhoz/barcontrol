@@ -253,15 +253,11 @@ function getNextPedidoNumero(db: LocalDb): number {
 
 export async function authOperador(login: string, senha: string): Promise<Operador | null> {
   const db = await readDb();
-  // Compat: converte perfil antigo "caixa" para "admin" no modo local.
-  for (const operador of db.operadores) {
-    if (operador.perfil === "caixa") {
-      operador.perfil = "admin";
-    }
-  }
-  await writeDb(db);
+  const operadoresNormalizados = db.operadores.map((operador) =>
+    operador.perfil === "caixa" ? { ...operador, perfil: "admin" } : operador
+  );
   return (
-    db.operadores.find(
+    operadoresNormalizados.find(
       (operador) => operador.login === login && operador.senha === senha && operador.ativo
     ) ?? null
   );
