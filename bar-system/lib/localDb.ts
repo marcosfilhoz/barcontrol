@@ -217,7 +217,16 @@ async function readDb(): Promise<LocalDb> {
 }
 
 async function writeDb(db: LocalDb): Promise<void> {
-  await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+  try {
+    await fs.mkdir(DB_DIR, { recursive: true });
+    await fs.writeFile(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+  } catch (error) {
+    // Em produção (Vercel), o filesystem pode ser somente leitura.
+    // Nesses casos, ignoramos o erro para não quebrar a requisição.
+    if (process.env.NODE_ENV !== "production") {
+      throw error;
+    }
+  }
 }
 
 function findOrCreateOpenPedido(db: LocalDb, mesaId: string): Pedido {
