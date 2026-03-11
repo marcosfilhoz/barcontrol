@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
-import {
-  createCategoria,
-  deleteCategoria,
-  listCategorias,
-  updateCategoria
-} from "@/lib/localDb";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function GET() {
   try {
-    const categorias = await listCategorias();
+    const { data, error } = await supabase
+      .from("categorias")
+      .select("id, nome")
+      .order("nome", { ascending: true });
+    if (error) {
+      throw error;
+    }
+    const categorias = data ?? [];
     return NextResponse.json({ categorias });
   } catch {
     return NextResponse.json({ message: "Erro ao carregar categorias." }, { status: 500 });
@@ -22,7 +24,10 @@ export async function POST(request: Request) {
     if (!nome) {
       return NextResponse.json({ message: "Nome obrigatório." }, { status: 400 });
     }
-    await createCategoria(nome);
+    const { error } = await supabase.from("categorias").insert({ nome });
+    if (error) {
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao criar categoria.";
@@ -36,7 +41,13 @@ export async function PUT(request: Request) {
     if (!body.id || !body.nome?.trim()) {
       return NextResponse.json({ message: "Dados inválidos para edição." }, { status: 400 });
     }
-    await updateCategoria(body.id, body.nome);
+    const { error } = await supabase
+      .from("categorias")
+      .update({ nome: body.nome.trim() })
+      .eq("id", body.id);
+    if (error) {
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao editar categoria.";
@@ -50,7 +61,10 @@ export async function DELETE(request: Request) {
     if (!body.id) {
       return NextResponse.json({ message: "ID obrigatório." }, { status: 400 });
     }
-    await deleteCategoria(body.id);
+    const { error } = await supabase.from("categorias").delete().eq("id", body.id);
+    if (error) {
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao excluir categoria.";
