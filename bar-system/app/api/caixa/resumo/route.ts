@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCaixaResumo } from "@/lib/localDb";
+import { getCaixaResumo } from "@/lib/caixaDb";
 
 export async function GET(request: Request) {
   try {

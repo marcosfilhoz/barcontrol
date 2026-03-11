@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRelatorioFechamentos } from "@/lib/localDb";
+import { getRelatorioFechamentos } from "@/lib/caixaDb";
 
 export async function GET(request: Request) {
   try {

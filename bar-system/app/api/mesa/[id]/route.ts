@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMesaContext } from "@/lib/localDb";
+import { getMesaContext } from "@/lib/mesasDb";
 
 export async function GET(
   _request: Request,

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { listCozinhaItens, markPedidoItemFinalizado, markPedidoItemImpresso } from "@/lib/localDb";
+import {
+  listCozinhaItens,
+  markPedidoItemFinalizado,
+  markPedidoItemImpresso
+} from "@/lib/cozinhaDb";
 
 export async function GET(request: Request) {
   try {

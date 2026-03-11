@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listMesas } from "@/lib/localDb";
+import { listMesas } from "@/lib/mesasDb";
 
 export async function GET() {
   try {

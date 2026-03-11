@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { closePessoa } from "@/lib/localDb";
+import { closePessoa } from "@/lib/caixaDb";
 
 export async function POST(request: Request) {
   try {

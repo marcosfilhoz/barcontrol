@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { cancelPedidoItem } from "@/lib/localDb";
+import { cancelPedidoItem } from "@/lib/mesasDb";
 
 export async function DELETE(
   _request: Request,

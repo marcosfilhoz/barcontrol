@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { closeMesa } from "@/lib/localDb";
+import { closeMesa } from "@/lib/caixaDb";
 
 export async function POST(request: Request) {
   try {

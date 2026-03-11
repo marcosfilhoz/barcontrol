@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { addItem } from "@/lib/localDb";
+import { addItem } from "@/lib/mesasDb";
 
 export async function POST(
   request: Request,
