@@ -48,11 +48,21 @@ function formatCurrency(value: number): string {
 function formatDateTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR");
+  return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+function todayInBrasilia(): string {
+  const nowInBr = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+  const year = nowInBr.getFullYear();
+  const month = String(nowInBr.getMonth() + 1).padStart(2, "0");
+  const day = String(nowInBr.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export default function Home() {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayInBrasilia(), []);
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [resumosCaixa, setResumosCaixa] = useState<CaixaResumo[]>([]);
   const [cozinhaItens, setCozinhaItens] = useState<CozinhaItem[]>([]);

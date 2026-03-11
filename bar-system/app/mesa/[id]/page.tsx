@@ -252,7 +252,7 @@ export default function MesaDetailPage() {
     if (!value) return "-";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString("pt-BR");
+    return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
   }
 
   if (loading) {

@@ -38,10 +38,10 @@ function printTicket80mm(item: ItemCozinha) {
         <title>Comanda Cozinha</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
-          body { width: 80mm; margin: 0; padding: 8px; font-family: monospace; font-size: 12px; }
-          .title { font-weight: bold; font-size: 14px; margin-bottom: 8px; }
-          .line { margin: 3px 0; }
-          .sep { border-top: 1px dashed #000; margin: 8px 0; }
+          body { width: 80mm; margin: 0; padding: 6px; font-family: monospace; font-size: 16px; }
+          .title { font-weight: bold; font-size: 20px; margin-bottom: 10px; }
+          .line { margin: 4px 0; }
+          .sep { border-top: 2px dashed #000; margin: 10px 0; }
         </style>
       </head>
       <body>

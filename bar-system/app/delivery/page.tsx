@@ -49,7 +49,7 @@ function labelPagamento(tipo: TipoPagamento): string {
 function formatDateTimeBr(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR");
+  return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
 function imprimirPedidoEntregador(pedido: PedidoDelivery, itens: ItemDetalhe[], total: number) {
@@ -73,11 +73,11 @@ function imprimirPedidoEntregador(pedido: PedidoDelivery, itens: ItemDetalhe[], 
         <title>Entrega #${pedido.numero}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
-          body { width: 80mm; margin: 0; padding: 8px; font-family: monospace; font-size: 12px; color: #000; }
-          .title { font-weight: bold; font-size: 14px; margin-bottom: 8px; text-transform: uppercase; }
-          .line { margin: 3px 0; word-break: break-word; }
-          .sep { border-top: 1px dashed #000; margin: 8px 0; }
-          .total { font-weight: bold; font-size: 13px; margin-top: 6px; }
+          body { width: 80mm; margin: 0; padding: 6px; font-family: monospace; font-size: 16px; color: #000; }
+          .title { font-weight: bold; font-size: 20px; margin-bottom: 10px; text-transform: uppercase; }
+          .line { margin: 4px 0; word-break: break-word; }
+          .sep { border-top: 2px dashed #000; margin: 10px 0; }
+          .total { font-weight: bold; font-size: 18px; margin-top: 8px; }
         </style>
       </head>
       <body>

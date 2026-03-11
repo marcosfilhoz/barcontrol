@@ -55,7 +55,17 @@ function labelPagamento(tipo: DeliveryAberto["tipoPagamento"]): string {
 function formatDateTimeBr(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("pt-BR");
+  return date.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+
+function todayInBrasilia(): string {
+  const nowInBr = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
+  );
+  const year = nowInBr.getFullYear();
+  const month = String(nowInBr.getMonth() + 1).padStart(2, "0");
+  const day = String(nowInBr.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function imprimirCupomConta(resumo: ContaResumo, dataSelecionada: string) {
@@ -90,12 +100,12 @@ function imprimirCupomConta(resumo: ContaResumo, dataSelecionada: string) {
         <title>Fechamento ${resumo.atendimentoTipo === "mesa" ? `Mesa ${resumo.mesa?.numero ?? "-"}` : `Delivery #${resumo.delivery?.pedidoNumero ?? "-"}`}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
-          body { width: 80mm; margin: 0; padding: 8px; font-family: monospace; font-size: 12px; color: #000; }
-          .title { font-weight: bold; font-size: 14px; margin-bottom: 8px; text-transform: uppercase; }
-          .line { margin: 3px 0; word-break: break-word; }
+          body { width: 80mm; margin: 0; padding: 6px; font-family: monospace; font-size: 16px; color: #000; }
+          .title { font-weight: bold; font-size: 20px; margin-bottom: 10px; text-transform: uppercase; }
+          .line { margin: 4px 0; word-break: break-word; }
           .item { padding-left: 6px; }
-          .sep { border-top: 1px dashed #000; margin: 8px 0; }
-          .total { font-weight: bold; font-size: 13px; margin-top: 6px; }
+          .sep { border-top: 2px dashed #000; margin: 10px 0; }
+          .total { font-weight: bold; font-size: 18px; margin-top: 8px; }
         </style>
       </head>
       <body>
@@ -130,7 +140,7 @@ export default function CaixaPage() {
   const [openMesaId, setOpenMesaId] = useState<string | null>(null);
   const [openPessoaId, setOpenPessoaId] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => todayInBrasilia(), []);
   const [dataInicio, setDataInicio] = useState(today);
   const [dataFim, setDataFim] = useState(today);
 
