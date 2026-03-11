@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
-import {
-  createOperador,
-  deleteOperador,
-  listOperadores,
-  updateOperador
-} from "@/lib/localDb";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function GET() {
   try {
-    const usuarios = await listOperadores();
+    const { data, error } = await supabase
+      .from("operadores")
+      .select("id, nome, login, perfil, ativo")
+      .order("nome", { ascending: true });
+    if (error) {
+      throw error;
+    }
+    const usuarios = (data ?? []).map((op) => ({
+      id: op.id,
+      nome: op.nome ?? "",
+      login: op.login,
+      perfil: op.perfil === "admin" ? "admin" : "garcom",
+      ativo: op.ativo
+    }));
     return NextResponse.json({ usuarios });
   } catch {
     return NextResponse.json({ message: "Erro ao carregar usuários." }, { status: 500 });
@@ -35,7 +43,16 @@ export async function POST(request: Request) {
       );
     }
 
-    await createOperador({ nome, login, senha, perfil });
+    const { error } = await supabase.from("operadores").insert({
+      nome,
+      login,
+      senha,
+      perfil,
+      ativo: true
+    });
+    if (error) {
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao criar usuário.";
@@ -60,12 +77,18 @@ export async function PUT(request: Request) {
     ) {
       return NextResponse.json({ message: "Dados inválidos para edição." }, { status: 400 });
     }
-    await updateOperador(body.id, {
+    const update: Record<string, unknown> = {
       nome: body.nome,
       login: body.login,
-      perfil: body.perfil,
-      senha: body.senha
-    });
+      perfil: body.perfil
+    };
+    if (body.senha?.trim()) {
+      update.senha = body.senha.trim();
+    }
+    const { error } = await supabase.from("operadores").update(update).eq("id", body.id);
+    if (error) {
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao editar usuário.";
@@ -79,7 +102,10 @@ export async function DELETE(request: Request) {
     if (!body.id) {
       return NextResponse.json({ message: "ID obrigatório." }, { status: 400 });
     }
-    await deleteOperador(body.id);
+    const { error } = await supabase.from("operadores").delete().eq("id", body.id);
+    if (error) {
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro ao excluir usuário.";

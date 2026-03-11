@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authOperador } from "@/lib/localDb";
+import { supabase } from "@/lib/supabaseClient";
 
 export async function POST(request: Request) {
   try {
@@ -11,18 +11,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Informe login e senha." }, { status: 400 });
     }
 
-    const operador = await authOperador(login, senha);
-    if (!operador) {
+    const { data, error } = await supabase
+      .from("operadores")
+      .select("perfil")
+      .eq("login", login)
+      .eq("senha", senha)
+      .eq("ativo", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
       return NextResponse.json({ message: "Login ou senha inválidos." }, { status: 401 });
     }
 
-    const response = NextResponse.json({ perfil: operador.perfil });
+    const response = NextResponse.json({ perfil: data.perfil });
     response.cookies.set("bar_session", "1", {
       path: "/",
       maxAge: 60 * 60 * 8,
       sameSite: "lax"
     });
-    response.cookies.set("bar_role", operador.perfil, {
+    response.cookies.set("bar_role", data.perfil, {
       path: "/",
       maxAge: 60 * 60 * 8,
       sameSite: "lax"
