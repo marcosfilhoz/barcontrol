@@ -29,31 +29,89 @@ function getNomeItemComCategoria(item: ItemCozinha) {
   return `${item.categoriaNome} ${item.produtoNome}`.trim();
 }
 
-function printTicket80mm(item: ItemCozinha) {
-  const opened = window.open("", "_blank", "width=360,height=640");
+function escaparHtml(texto: string) {
+  return texto
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function ordenarItensMesaParaImpressao(a: ItemCozinha, b: ItemCozinha) {
+  if (a.pedidoNumero !== b.pedidoNumero) return a.pedidoNumero - b.pedidoNumero;
+  const p = a.pessoaNome.localeCompare(b.pessoaNome, "pt-BR");
+  if (p !== 0) return p;
+  return a.itemId.localeCompare(b.itemId);
+}
+
+function printTicket80mm(itens: ItemCozinha[]) {
+  if (itens.length === 0) return false;
+  const opened = window.open("", "_blank", "width=360,height=960");
   if (!opened) return false;
+
+  const head = itens[0];
+  const isMesa = head.atendimentoTipo === "mesa";
+  const sorted = isMesa ? [...itens].sort(ordenarItensMesaParaImpressao) : itens;
+
+  let bodyHtml: string;
+  if (!isMesa) {
+    const item = sorted[0];
+    bodyHtml = `
+        <div class="title">COZINHA - NOVO ITEM</div>
+        <div class="line">Pedido: #${item.pedidoNumero}</div>
+        <div class="line">Delivery</div>
+        <div class="line">Pessoa: ${escaparHtml(item.pessoaNome)}</div>
+        <div class="sep"></div>
+        <div class="line"><b>${item.quantidade}x ${escaparHtml(getNomeItemComCategoria(item))}</b></div>
+        <div class="line">Obs: ${escaparHtml(item.observacao ?? "-")}</div>
+        <div class="sep"></div>
+        <div class="line">BarControl</div>`;
+  } else {
+    const titulo = sorted.length > 1 ? "COZINHA - NOVOS ITENS" : "COZINHA - NOVO ITEM";
+    const mesaNum = sorted[0].mesaNumero;
+    const blocos = sorted
+      .map(
+        (item) => `
+        <div class="sep"></div>
+        <div class="line">Pedido: #${item.pedidoNumero}</div>
+        <div class="line">Pessoa: ${escaparHtml(item.pessoaNome)}</div>
+        <div class="line"><b>${item.quantidade}x ${escaparHtml(getNomeItemComCategoria(item))}</b></div>
+        <div class="line">Obs: ${escaparHtml(item.observacao ?? "-")}</div>`
+      )
+      .join("");
+    bodyHtml = `
+        <div class="title">${titulo}</div>
+        <div class="line">Mesa: ${mesaNum}</div>
+        ${blocos}
+        <div class="sep"></div>
+        <div class="line">BarControl</div>`;
+  }
+
   opened.document.write(`
     <html>
       <head>
         <title>Comanda Cozinha</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
-          body { width: 80mm; margin: 0; padding: 6px; font-family: monospace; font-size: 16px; }
-          .title { font-weight: bold; font-size: 20px; margin-bottom: 10px; }
-          .line { margin: 4px 0; }
+          body {
+            width: 80mm;
+            max-width: 80mm;
+            margin: 0;
+            padding: 6px;
+            box-sizing: border-box;
+            font-family: ui-monospace, monospace;
+            font-size: 24px;
+            line-height: 1.2;
+            color: #000;
+            text-transform: uppercase;
+          }
+          .title { font-weight: bold; font-size: 32px; line-height: 1.1; margin-bottom: 10px; }
+          .line { margin: 5px 0; overflow-wrap: break-word; word-break: normal; }
           .sep { border-top: 2px dashed #000; margin: 10px 0; }
         </style>
       </head>
-      <body>
-        <div class="title">COZINHA - NOVO ITEM</div>
-        <div class="line">Pedido: #${item.pedidoNumero}</div>
-        <div class="line">${item.atendimentoTipo === "delivery" ? "Delivery" : `Mesa: ${item.mesaNumero}`}</div>
-        <div class="line">Pessoa: ${item.pessoaNome}</div>
-        <div class="sep"></div>
-        <div class="line"><b>${item.quantidade}x ${getNomeItemComCategoria(item)}</b></div>
-        <div class="line">Obs: ${item.observacao ?? "-"}</div>
-        <div class="sep"></div>
-        <div class="line">BarControl</div>
+      <body>${bodyHtml}
       </body>
     </html>
   `);
@@ -133,24 +191,42 @@ export default function CozinhaPage() {
     return acc;
   }, []);
 
+  function operacaoEmAndamentoParaItem(item: ItemCozinha, op: string | null) {
+    if (!op) return false;
+    if (op === `fin:${item.itemId}`) return true;
+    if (op === `print:item:${item.itemId}`) return true;
+    if (op === `print:mesa:${item.mesaNumero}` && item.atendimentoTipo === "mesa") return true;
+    return false;
+  }
+
   async function handleImprimir(item: ItemCozinha) {
-    setProcessingId(item.itemId);
-    const printed = printTicket80mm(item);
+    const batch =
+      item.atendimentoTipo === "mesa"
+        ? itens.filter((i) => i.atendimentoTipo === "mesa" && i.mesaNumero === item.mesaNumero)
+        : [item];
+
+    const printOp =
+      item.atendimentoTipo === "mesa" ? `print:mesa:${item.mesaNumero}` : `print:item:${item.itemId}`;
+    setProcessingId(printOp);
+
+    const printed = printTicket80mm(batch);
     if (!printed) {
       setProcessingId(null);
       setError("Não foi possível abrir janela de impressão.");
       return;
     }
     try {
-      if (!item.impresso) {
-        const response = await fetch("/api/cozinha", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemId: item.itemId })
-        });
-        const payload = (await response.json()) as { message?: string };
-        if (!response.ok) {
-          throw new Error(payload.message ?? "Erro ao marcar item como impresso.");
+      for (const i of batch) {
+        if (!i.impresso) {
+          const response = await fetch("/api/cozinha", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ itemId: i.itemId })
+          });
+          const payload = (await response.json()) as { message?: string };
+          if (!response.ok) {
+            throw new Error(payload.message ?? "Erro ao marcar item como impresso.");
+          }
         }
       }
       await carregar();
@@ -162,7 +238,7 @@ export default function CozinhaPage() {
   }
 
   async function handleFinalizar(item: ItemCozinha) {
-    setProcessingId(item.itemId);
+    setProcessingId(`fin:${item.itemId}`);
     try {
       const response = await fetch("/api/cozinha", {
         method: "POST",
@@ -274,11 +350,12 @@ export default function CozinhaPage() {
                         ) : null}
                         <button
                           type="button"
-                          disabled={processingId === item.itemId}
+                          disabled={operacaoEmAndamentoParaItem(item, processingId)}
                           onClick={() => void handleImprimir(item)}
                           className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60"
                         >
-                          {processingId === item.itemId
+                          {operacaoEmAndamentoParaItem(item, processingId) &&
+                          processingId?.startsWith("print:")
                             ? "Imprimindo..."
                             : item.impresso
                               ? "Reimprimir"
@@ -287,7 +364,7 @@ export default function CozinhaPage() {
                         {filtro === "impressos" && !item.finalizado ? (
                           <button
                             type="button"
-                            disabled={processingId === item.itemId}
+                            disabled={operacaoEmAndamentoParaItem(item, processingId)}
                             onClick={() => void handleFinalizar(item)}
                             className="rounded-lg bg-white px-3 py-2 text-sm text-slate-900 shadow-sm disabled:opacity-60"
                           >

@@ -100,12 +100,23 @@ function imprimirCupomConta(resumo: ContaResumo, dataSelecionada: string) {
         <title>Fechamento ${resumo.atendimentoTipo === "mesa" ? `Mesa ${resumo.mesa?.numero ?? "-"}` : `Delivery #${resumo.delivery?.pedidoNumero ?? "-"}`}</title>
         <style>
           @page { size: 80mm auto; margin: 0; }
-          body { width: 80mm; margin: 0; padding: 6px; font-family: monospace; font-size: 16px; color: #000; }
-          .title { font-weight: bold; font-size: 20px; margin-bottom: 10px; text-transform: uppercase; }
-          .line { margin: 4px 0; word-break: break-word; }
+          body {
+            width: 80mm;
+            max-width: 80mm;
+            margin: 0;
+            padding: 6px;
+            box-sizing: border-box;
+            font-family: ui-monospace, monospace;
+            font-size: 24px;
+            line-height: 1.2;
+            color: #000;
+            text-transform: uppercase;
+          }
+          .title { font-weight: bold; font-size: 32px; line-height: 1.1; margin-bottom: 10px; }
+          .line { margin: 5px 0; overflow-wrap: break-word; word-break: normal; }
           .item { padding-left: 6px; }
           .sep { border-top: 2px dashed #000; margin: 10px 0; }
-          .total { font-weight: bold; font-size: 18px; margin-top: 8px; }
+          .total { font-weight: bold; font-size: 28px; line-height: 1.15; margin-top: 8px; }
         </style>
       </head>
       <body>
