@@ -49,92 +49,65 @@ async function markPrintedBulk(itemIds) {
   }
 }
 
-async function getMesaIdFromPessoaId(pessoaId) {
-  const { data: pm, error } = await supabase
-    .from("pessoas_mesa")
-    .select("pedido_id")
-    .eq("id", pessoaId)
-    .maybeSingle();
-  if (error || !pm?.pedido_id) return null;
-  const { data: ped, error: e2 } = await supabase
-    .from("pedidos")
-    .select("mesa_id")
-    .eq("id", pm.pedido_id)
-    .maybeSingle();
-  if (e2 || !ped?.mesa_id) return null;
-  return ped.mesa_id;
-}
-
-async function fetchMesaNumero(mesaId) {
-  const { data } = await supabase.from("mesas").select("numero").eq("id", mesaId).maybeSingle();
-  return data?.numero ?? "?";
-}
-
 /**
- * Todos os itens do pedido aberto da mesa ainda nao impressos (e nao finalizados).
+ * Itens pendentes da mesma pessoa na mesa (comanda = mesmo bloco Pedido + Pessoa na cozinha web).
  */
-async function fetchPendingItemsForMesa(mesaId) {
-  const { data: pedidos, error } = await supabase
-    .from("pedidos")
-    .select("id")
-    .eq("mesa_id", mesaId)
-    .eq("status", "aberto");
-  if (error || !pedidos?.length) return [];
-
-  const pedidoIds = pedidos.map((p) => p.id);
-  const { data: pessoas, error: pErr } = await supabase
-    .from("pessoas_mesa")
-    .select("id")
-    .in("pedido_id", pedidoIds)
-    .is("fechado_em", null);
-  if (pErr || !pessoas?.length) return [];
-
-  const pessoaIds = pessoas.map((p) => p.id);
-  const { data: itens, error: iErr } = await supabase
+async function fetchPendingItemsForPessoa(pessoaId) {
+  const { data: itens, error } = await supabase
     .from("pedido_itens")
     .select(
       "id, quantidade, observacao, impresso, finalizado, produtos(nome, preco, setor_impressao), pessoas_mesa(nome, pedido_id)"
     )
-    .in("pessoa_id", pessoaIds)
+    .eq("pessoa_id", pessoaId)
     .eq("impresso", false);
-  if (iErr) {
-    console.error("Erro ao buscar itens pendentes:", iErr.message);
+
+  if (error) {
+    console.error("Erro ao buscar itens pendentes:", error.message);
     return [];
   }
 
-  const rows = itens ?? [];
-  const pedidoIdSet = [...new Set(rows.map((r) => r.pessoas_mesa?.pedido_id).filter(Boolean))];
-  let pedidoNumeros = new Map();
-  if (pedidoIdSet.length > 0) {
-    const { data: peds } = await supabase.from("pedidos").select("id, numero").in("id", pedidoIdSet);
-    for (const p of peds ?? []) {
-      pedidoNumeros.set(p.id, p.numero);
+  const rows = (itens ?? []).filter((r) => !r.finalizado);
+  if (rows.length === 0) return [];
+
+  const pedidoId = rows[0].pessoas_mesa?.pedido_id;
+  let _pedidoNumero = null;
+  let _mesaNumero = "?";
+  if (pedidoId) {
+    const { data: ped } = await supabase
+      .from("pedidos")
+      .select("numero, mesa_id")
+      .eq("id", pedidoId)
+      .maybeSingle();
+    _pedidoNumero = ped?.numero ?? null;
+    if (ped?.mesa_id) {
+      const { data: mesa } = await supabase
+        .from("mesas")
+        .select("numero")
+        .eq("id", ped.mesa_id)
+        .maybeSingle();
+      if (mesa?.numero != null) _mesaNumero = mesa.numero;
     }
   }
 
-  return rows
-    .filter((r) => !r.finalizado)
-    .map((r) => ({
-      ...r,
-      _pedidoNumero: r.pessoas_mesa?.pedido_id ? pedidoNumeros.get(r.pessoas_mesa.pedido_id) : null
-    }));
+  return rows.map((r) => ({ ...r, _pedidoNumero, _mesaNumero }));
 }
 
 function sortItemsForTicket(a, b) {
-  const pa = a._pedidoNumero ?? 0;
-  const pb = b._pedidoNumero ?? 0;
-  if (pa !== pb) return pa - pb;
-  const na = a.pessoas_mesa?.nome || "";
-  const nb = b.pessoas_mesa?.nome || "";
-  if (na !== nb) return na.localeCompare(nb, "pt-BR");
   return String(a.id).localeCompare(String(b.id));
 }
 
-function buildCombinedTicket(items, mesaNumero) {
+function buildCombinedTicket(items) {
   const sorted = [...items].sort(sortItemsForTicket);
+  const head = sorted[0];
+  const mesaNumero = head._mesaNumero ?? "?";
+  const pedidoN = head._pedidoNumero != null ? String(head._pedidoNumero) : "?";
+  const pessoa = head.pessoas_mesa?.nome || "Sem nome";
+
   const lines = [
     "======== COZINHA ========",
     `MESA ${mesaNumero}`,
+    `PEDIDO #${pedidoN}`,
+    `PESSOA: ${pessoa}`,
     `ITENS: ${sorted.length}`,
     "-------------------------"
   ];
@@ -142,12 +115,8 @@ function buildCombinedTicket(items, mesaNumero) {
   for (const item of sorted) {
     const produtoNome = item.produtos?.nome || "Produto";
     const setor = item.produtos?.setor_impressao || "cozinha";
-    const pessoa = item.pessoas_mesa?.nome || "Sem nome";
     const qtd = item.quantidade || 1;
     const preco = formatCurrency(item.produtos?.preco);
-    const pedidoN = item._pedidoNumero != null ? String(item._pedidoNumero) : "?";
-    lines.push(`PEDIDO #${pedidoN}`);
-    lines.push(`PESSOA: ${pessoa}`);
     lines.push(`SETOR: ${setor}`);
     lines.push(`ITEM: ${produtoNome}`);
     lines.push(`QTD: ${qtd}  PRECO: R$ ${preco}`);
@@ -163,29 +132,31 @@ function buildCombinedTicket(items, mesaNumero) {
   return `${ESC_INIT}${ESC_DOUBLE}${body}\n${ESC_NORMAL}`;
 }
 
-function scheduleMesaFlush(mesaId) {
-  if (debouncers.has(mesaId)) {
-    clearTimeout(debouncers.get(mesaId));
+function schedulePessoaFlush(pessoaId) {
+  if (debouncers.has(pessoaId)) {
+    clearTimeout(debouncers.get(pessoaId));
   }
   const t = setTimeout(() => {
-    debouncers.delete(mesaId);
-    void flushMesaPrint(mesaId);
+    debouncers.delete(pessoaId);
+    void flushPessoaPrint(pessoaId);
   }, DEBOUNCE_MS);
-  debouncers.set(mesaId, t);
+  debouncers.set(pessoaId, t);
 }
 
-async function flushMesaPrint(mesaId) {
+async function flushPessoaPrint(pessoaId) {
   try {
-    const items = await fetchPendingItemsForMesa(mesaId);
+    const items = await fetchPendingItemsForPessoa(pessoaId);
     if (items.length === 0) return;
 
-    const mesaNumero = await fetchMesaNumero(mesaId);
-    const ticket = buildCombinedTicket(items, mesaNumero);
+    const ticket = buildCombinedTicket(items);
     await sendToPrinter(ticket);
     await markPrintedBulk(items.map((i) => i.id));
-    console.log(`Mesa ${mesaNumero}: ${items.length} item(ns) impresso(s) em um unico cupom.`);
+    const mesa = items[0]._mesaNumero ?? "?";
+    console.log(
+      `Comanda (pessoa ${pessoaId.slice(0, 8)}…): mesa ${mesa}, ${items.length} item(ns) em um cupom.`
+    );
   } catch (err) {
-    console.error("Falha ao imprimir lote da mesa:", err.message || err);
+    console.error("Falha ao imprimir lote da comanda:", err.message || err);
   }
 }
 
@@ -234,15 +205,14 @@ async function printSingleItemFallback(item) {
   const ticket = `${ESC_INIT}${ESC_DOUBLE}${lines.toUpperCase()}\n${ESC_NORMAL}`;
   await sendToPrinter(ticket);
   await markPrintedBulk([item.id]);
-  console.log(`Item ${item.id} impresso (fallback sem mesa).`);
+  console.log(`Item ${item.id} impresso (fallback sem pessoa_id).`);
 }
 
 async function processItemInsert(row) {
   if (!row || row.impresso) return;
 
-  const mesaId = await getMesaIdFromPessoaId(row.pessoa_id);
-  if (mesaId) {
-    scheduleMesaFlush(mesaId);
+  if (row.pessoa_id) {
+    schedulePessoaFlush(row.pessoa_id);
     return;
   }
 
@@ -270,7 +240,9 @@ function startRealtimeListener() {
     });
 
   console.log(`Print Agent ouvindo inserts de pedido_itens para ${PRINTER_HOST}:${PRINTER_PORT}`);
-  console.log(`Agrupamento por mesa: debounce ${DEBOUNCE_MS}ms, texto em caixa alta + tamanho ESC/POS maior.`);
+  console.log(
+    `Agrupamento por comanda (pessoa na mesa): debounce ${DEBOUNCE_MS}ms, caixa alta + ESC/POS maior.`
+  );
 
   process.on("SIGINT", async () => {
     for (const t of debouncers.values()) {

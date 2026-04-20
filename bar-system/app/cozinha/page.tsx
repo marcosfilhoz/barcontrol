@@ -38,11 +38,15 @@ function escaparHtml(texto: string) {
     .replaceAll("'", "&#39;");
 }
 
-function ordenarItensMesaParaImpressao(a: ItemCozinha, b: ItemCozinha) {
+function ordenarItensCozinhaImpressao(a: ItemCozinha, b: ItemCozinha) {
   if (a.pedidoNumero !== b.pedidoNumero) return a.pedidoNumero - b.pedidoNumero;
   const p = a.pessoaNome.localeCompare(b.pessoaNome, "pt-BR");
   if (p !== 0) return p;
   return a.itemId.localeCompare(b.itemId);
+}
+
+function grupoKeyFromItem(item: ItemCozinha) {
+  return `${item.atendimentoTipo}::${item.pedidoNumero}::${item.pessoaNome}`;
 }
 
 function printTicket80mm(itens: ItemCozinha[]) {
@@ -52,34 +56,55 @@ function printTicket80mm(itens: ItemCozinha[]) {
 
   const head = itens[0];
   const isMesa = head.atendimentoTipo === "mesa";
-  const sorted = isMesa ? [...itens].sort(ordenarItensMesaParaImpressao) : itens;
+  const sorted = [...itens].sort(ordenarItensCozinhaImpressao);
 
   let bodyHtml: string;
   if (!isMesa) {
-    const item = sorted[0];
-    bodyHtml = `
-        <div class="title">COZINHA - NOVO ITEM</div>
-        <div class="line">Pedido: #${item.pedidoNumero}</div>
-        <div class="line">Delivery</div>
-        <div class="line">Pessoa: ${escaparHtml(item.pessoaNome)}</div>
+    const titulo = sorted.length > 1 ? "COZINHA - NOVOS ITENS" : "COZINHA - NOVO ITEM";
+    const blocosItens = sorted
+      .map(
+        (item) => `
         <div class="sep"></div>
         <div class="line"><b>${item.quantidade}x ${escaparHtml(getNomeItemComCategoria(item))}</b></div>
-        <div class="line">Obs: ${escaparHtml(item.observacao ?? "-")}</div>
+        <div class="line">Obs: ${escaparHtml(item.observacao ?? "-")}</div>`
+      )
+      .join("");
+    bodyHtml = `
+        <div class="title">${titulo}</div>
+        <div class="line">Delivery</div>
+        <div class="line">Pedido: #${sorted[0].pedidoNumero}</div>
+        <div class="line">Cliente: ${escaparHtml(sorted[0].pessoaNome)}</div>
+        ${blocosItens}
         <div class="sep"></div>
         <div class="line">BarControl</div>`;
   } else {
     const titulo = sorted.length > 1 ? "COZINHA - NOVOS ITENS" : "COZINHA - NOVO ITEM";
     const mesaNum = sorted[0].mesaNumero;
-    const blocos = sorted
-      .map(
-        (item) => `
+    const mesmoPedidoPessoa = sorted.every(
+      (i) => i.pedidoNumero === sorted[0].pedidoNumero && i.pessoaNome === sorted[0].pessoaNome
+    );
+    const blocos = mesmoPedidoPessoa
+      ? `
+        <div class="sep"></div>
+        <div class="line">Pedido: #${sorted[0].pedidoNumero}</div>
+        <div class="line">Pessoa: ${escaparHtml(sorted[0].pessoaNome)}</div>
+        ${sorted
+          .map(
+            (item) => `
+        <div class="line"><b>${item.quantidade}x ${escaparHtml(getNomeItemComCategoria(item))}</b></div>
+        <div class="line">Obs: ${escaparHtml(item.observacao ?? "-")}</div>`
+          )
+          .join("")}`
+      : sorted
+          .map(
+            (item) => `
         <div class="sep"></div>
         <div class="line">Pedido: #${item.pedidoNumero}</div>
         <div class="line">Pessoa: ${escaparHtml(item.pessoaNome)}</div>
         <div class="line"><b>${item.quantidade}x ${escaparHtml(getNomeItemComCategoria(item))}</b></div>
         <div class="line">Obs: ${escaparHtml(item.observacao ?? "-")}</div>`
-      )
-      .join("");
+          )
+          .join("");
     bodyHtml = `
         <div class="title">${titulo}</div>
         <div class="line">Mesa: ${mesaNum}</div>
@@ -191,23 +216,32 @@ export default function CozinhaPage() {
     return acc;
   }, []);
 
+  const itensDoMesmoPedidoPessoa = useCallback(
+    (item: ItemCozinha) =>
+      itens.filter(
+        (i) =>
+          i.atendimentoTipo === item.atendimentoTipo &&
+          i.pedidoNumero === item.pedidoNumero &&
+          i.pessoaNome === item.pessoaNome
+      ),
+    [itens]
+  );
+
   function operacaoEmAndamentoParaItem(item: ItemCozinha, op: string | null) {
     if (!op) return false;
     if (op === `fin:${item.itemId}`) return true;
-    if (op === `print:item:${item.itemId}`) return true;
-    if (op === `print:mesa:${item.mesaNumero}` && item.atendimentoTipo === "mesa") return true;
-    return false;
+    return op === `print-grupo|${grupoKeyFromItem(item)}`;
   }
 
-  async function handleImprimir(item: ItemCozinha) {
-    const batch =
-      item.atendimentoTipo === "mesa"
-        ? itens.filter((i) => i.atendimentoTipo === "mesa" && i.mesaNumero === item.mesaNumero)
-        : [item];
+  function operacaoEmAndamentoParaGrupo(grupo: GrupoCozinha, op: string | null) {
+    return op === `print-grupo|${grupo.key}`;
+  }
 
-    const printOp =
-      item.atendimentoTipo === "mesa" ? `print:mesa:${item.mesaNumero}` : `print:item:${item.itemId}`;
-    setProcessingId(printOp);
+  async function handleImprimirGrupo(grupo: GrupoCozinha) {
+    const first = grupo.itens[0];
+    if (!first) return;
+    const batch = itensDoMesmoPedidoPessoa(first);
+    setProcessingId(`print-grupo|${grupo.key}`);
 
     const printed = printTicket80mm(batch);
     if (!printed) {
@@ -309,25 +343,39 @@ export default function CozinhaPage() {
         <section className="space-y-3">
           {grupos.map((grupo) => (
             <article key={grupo.key} className="ui-card p-4">
-              <button
-                type="button"
-                onClick={() =>
-                  setOpenGrupoKey((current) => (current === grupo.key ? null : grupo.key))
-                }
-                className="mb-2 flex w-full items-start justify-between text-left"
-              >
-                <div>
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenGrupoKey((current) => (current === grupo.key ? null : grupo.key))
+                  }
+                  className="min-w-0 flex-1 rounded-lg text-left ring-offset-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                >
                   <p className="text-sm font-semibold">
                     {grupo.itens[0]?.atendimentoTipo === "delivery"
                       ? `Delivery | Pedido #${grupo.pedidoNumero}`
                       : `Mesa ${grupo.mesaNumero} | Pedido #${grupo.pedidoNumero}`}
                   </p>
                   <p className="text-sm text-slate-600">{grupo.pessoaNome}</p>
+                  <span className="mt-1 inline-block text-xs text-slate-500">
+                    {openGrupoKey === grupo.key ? "fechar detalhes" : "abrir detalhes"}
+                  </span>
+                </button>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={operacaoEmAndamentoParaGrupo(grupo, processingId)}
+                    onClick={() => void handleImprimirGrupo(grupo)}
+                    className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {operacaoEmAndamentoParaGrupo(grupo, processingId)
+                      ? "Imprimindo..."
+                      : grupo.itens.every((i) => i.impresso)
+                        ? "Reimprimir pedido"
+                        : "Imprimir pedido"}
+                  </button>
                 </div>
-                <span className="text-xs text-slate-500">
-                  {openGrupoKey === grupo.key ? "fechar" : "abrir"}
-                </span>
-              </button>
+              </div>
 
               {openGrupoKey === grupo.key ? (
                 <div className="space-y-2">
@@ -348,19 +396,6 @@ export default function CozinhaPage() {
                             Finalizado
                           </span>
                         ) : null}
-                        <button
-                          type="button"
-                          disabled={operacaoEmAndamentoParaItem(item, processingId)}
-                          onClick={() => void handleImprimir(item)}
-                          className="rounded-lg bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60"
-                        >
-                          {operacaoEmAndamentoParaItem(item, processingId) &&
-                          processingId?.startsWith("print:")
-                            ? "Imprimindo..."
-                            : item.impresso
-                              ? "Reimprimir"
-                              : "Imprimir"}
-                        </button>
                         {filtro === "impressos" && !item.finalizado ? (
                           <button
                             type="button"

@@ -26,7 +26,7 @@ npm start
 O agente escuta inserts em `pedido_itens` e:
 
 - ignora itens ja impressos
-- agrupa por **mesa**: espera um curto intervalo (`PRINT_DEBOUNCE_MS`, padrao 450ms) e imprime **um unico cupom** com todos os itens pendentes da mesma mesa (pedido aberto), depois marca `impresso = true` em todos
+- agrupa por **comanda** (`pessoa_id` na mesa): espera um curto intervalo (`PRINT_DEBOUNCE_MS`, padrao 450ms) e imprime **um unico cupom** com todos os itens pendentes daquela pessoa no pedido (igual ao bloco Pedido + Cliente na tela Cozinha), depois marca `impresso = true` em todos
 - texto em **caixa alta** e tamanho maior na impressora (ESC/POS)
 - se nao houver `mesa_id` (caso raro), imprime um item so como antes
 
