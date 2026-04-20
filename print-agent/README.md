@@ -26,6 +26,8 @@ npm start
 O agente escuta inserts em `pedido_itens` e:
 
 - ignora itens ja impressos
-- busca os detalhes do item
-- envia para a impressora via TCP
-- marca `impresso = true`
+- agrupa por **mesa**: espera um curto intervalo (`PRINT_DEBOUNCE_MS`, padrao 450ms) e imprime **um unico cupom** com todos os itens pendentes da mesma mesa (pedido aberto), depois marca `impresso = true` em todos
+- texto em **caixa alta** e tamanho maior na impressora (ESC/POS)
+- se nao houver `mesa_id` (caso raro), imprime um item so como antes
+
+**Importante:** isso e o fluxo que realmente manda para a impressora na rede. A tela web `/cozinha` e outro caminho (impressao pelo navegador). Apos atualizar o agente, rode `npm start` de novo no PC do caixa/cozinha.
